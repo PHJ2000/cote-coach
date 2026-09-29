@@ -4,14 +4,25 @@ import {normalizeCompletionList,textRange,completionRange,markdown} from './lsp-
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js';
 import 'monaco-editor/esm/vs/basic-languages/java/java.contribution.js';
 self.MonacoEnvironment={getWorker(){return new Worker('/dist/editor.worker.js',{type:'module'});}};
-monaco.editor.defineTheme('practice-dark',{
- base:'vs-dark',inherit:true,rules:[],colors:{
-  'editorSuggestWidget.background':'#252729','editorSuggestWidget.border':'#3b3e43',
-  'editorSuggestWidget.foreground':'#c5c9d2','editorSuggestWidget.selectedBackground':'#36383e',
-  'editorSuggestWidget.selectedForeground':'#e0e4ec','editorSuggestWidget.highlightForeground':'#79a9ee',
-  'editorSuggestWidget.focusHighlightForeground':'#79a9ee','editorSuggestWidgetStatus.foreground':'#939ba9'
- }
-});
+const suggestDark={'editorSuggestWidget.background':'#16181d','editorSuggestWidget.border':'#2b2f38',
+ 'editorSuggestWidget.foreground':'#c9cdd6','editorSuggestWidget.selectedBackground':'#262a33',
+ 'editorSuggestWidget.selectedForeground':'#eef0f4','editorSuggestWidget.highlightForeground':'#f2b544',
+ 'editorSuggestWidget.focusHighlightForeground':'#f2b544','editorSuggestWidgetStatus.foreground':'#8b919d',
+ 'editorHoverWidget.background':'#16181d','editorHoverWidget.border':'#2b2f38'};
+monaco.editor.defineTheme('practice-dark',{base:'vs-dark',inherit:true,rules:[{token:'comment',foreground:'6b7280',fontStyle:'italic'},{token:'keyword',foreground:'f2a65a'},{token:'string',foreground:'9ece6a'},{token:'number',foreground:'e0af68'},{token:'type',foreground:'7dcfff'}],colors:{
+ ...suggestDark,'editor.background':'#0f1114','editorGutter.background':'#0f1114','editor.lineHighlightBackground':'#161920','editor.lineHighlightBorder':'#00000000',
+ 'editorLineNumber.foreground':'#454b56','editorLineNumber.activeForeground':'#c4c9d2','editorCursor.foreground':'#f2b544',
+ 'editor.selectionBackground':'#f2b5442e','editor.inactiveSelectionBackground':'#f2b5441a','editorIndentGuide.background1':'#1e2229','editorIndentGuide.activeBackground1':'#343944',
+ 'editorBracketMatch.background':'#f2b54422','editorBracketMatch.border':'#f2b54466','scrollbarSlider.background':'#ffffff14','scrollbarSlider.hoverBackground':'#ffffff22'
+}});
+monaco.editor.defineTheme('practice-light',{base:'vs',inherit:true,rules:[{token:'comment',foreground:'8a8f98',fontStyle:'italic'},{token:'keyword',foreground:'b4540a'},{token:'string',foreground:'2f7d32'},{token:'number',foreground:'9a6700'},{token:'type',foreground:'0b6aa2'}],colors:{
+ 'editor.background':'#fffefb','editorGutter.background':'#fffefb','editor.lineHighlightBackground':'#f6f3ec','editor.lineHighlightBorder':'#00000000',
+ 'editorLineNumber.foreground':'#b9b5ab','editorLineNumber.activeForeground':'#3b3d42','editorCursor.foreground':'#b77905',
+ 'editor.selectionBackground':'#e9a52933','editorIndentGuide.background1':'#eeebe3','editorBracketMatch.background':'#e9a52922','editorBracketMatch.border':'#e9a52977',
+ 'editorSuggestWidget.highlightForeground':'#a86b00','editorSuggestWidget.focusHighlightForeground':'#a86b00','editorSuggestWidget.selectedBackground':'#f1ece1'
+}});
+const themeName=()=>document.documentElement.dataset.theme==='light'?'practice-light':'practice-dark';
+export function syncEditorTheme(){monaco.editor.setTheme(themeName());}
 let active=null;
 const completionStates=new WeakMap();
 function snapshot(model,token){
@@ -88,12 +99,15 @@ monaco.languages.registerHoverProvider('java',{
   return {range:textRange(r.range),contents};
  }catch{return null;}}
 });
-export function createEditor(el,{sid,pid,code,training,api,onChange,onCursor,error}){
+export function createEditor(el,{sid,pid,code,training,api,onChange,onCursor,error,commands={}}){
  const models=new Map(),views=new Map(),instance=crypto.randomUUID();
  const modelFor=(id,value)=>{if(!models.has(id))models.set(id,monaco.editor.createModel(value,'java',monaco.Uri.parse('inmemory://practice/'+instance+'/'+id+'/Solution.java')));return models.get(id);};
  // Monaco 0.55.1 #5294: its pending word-highlighter rejects on model disposal.
  // No semantic highlight provider is registered here; selection highlighting stays available.
- const editor=monaco.editor.create(el,{model:modelFor(pid,code),editContext:false,language:'java',theme:'practice-dark',fontSize:14,fontFamily:'"JetBrains Mono", "D2Coding", Consolas, monospace',lineHeight:23,automaticLayout:true,minimap:{enabled:false},scrollBeyondLastLine:false,tabSize:4,insertSpaces:true,quickSuggestions:training?{other:true,comments:false,strings:false}:false,wordBasedSuggestions:'off',suggestOnTriggerCharacters:training,acceptSuggestionOnEnter:'off',parameterHints:{enabled:training},snippetSuggestions:'inline',suggestFontSize:14,suggestLineHeight:24,suggest:{insertMode:'replace',showInlineDetails:true,localityBonus:true,shareSuggestSelections:false,showStatusBar:true},suggestSelection:'first',quickSuggestionsDelay:120,autoClosingBrackets:'always',autoSurround:'brackets',autoIndent:'full',padding:{top:18,bottom:18},renderLineHighlight:'line',fixedOverflowWidgets:true,contextmenu:false,occurrencesHighlight:'off',stickyScroll:{enabled:false},ariaLabel:'Java 코드 편집기'});
+ const editor=monaco.editor.create(el,{model:modelFor(pid,code),editContext:false,language:'java',theme:themeName(),fontSize:14,fontFamily:'"JetBrains Mono", "D2Coding", Consolas, monospace',fontLigatures:false,lineHeight:23,automaticLayout:true,minimap:{enabled:false},scrollBeyondLastLine:false,tabSize:4,insertSpaces:true,quickSuggestions:training?{other:true,comments:false,strings:false}:false,wordBasedSuggestions:'off',suggestOnTriggerCharacters:training,acceptSuggestionOnEnter:'off',parameterHints:{enabled:training},snippetSuggestions:'inline',suggestFontSize:14,suggestLineHeight:24,suggest:{insertMode:'replace',showInlineDetails:true,localityBonus:true,shareSuggestSelections:false,showStatusBar:true},suggestSelection:'first',quickSuggestionsDelay:120,autoClosingBrackets:'always',autoSurround:'brackets',autoIndent:'full',padding:{top:18,bottom:18},renderLineHighlight:'line',fixedOverflowWidgets:true,contextmenu:false,occurrencesHighlight:'off',stickyScroll:{enabled:false},ariaLabel:'Java 코드 편집기'});
+ // Run/submit shortcuts must win over Monaco's own bindings while typing.
+ if(commands.run)editor.addCommand(monaco.KeyMod.CtrlCmd|monaco.KeyCode.Quote,commands.run);
+ if(commands.submit)editor.addCommand(monaco.KeyMod.CtrlCmd|monaco.KeyMod.Shift|monaco.KeyCode.Enter,commands.submit);
  let changing=false,diagTimer,lastError='';
  const owner={editor,sid,pid,training,api,requests:new Set(),error:m=>{if(m!==lastError){lastError=m;error(m);}}};active=owner;
  editor.onDidChangeModelContent(e=>{

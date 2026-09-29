@@ -8,8 +8,8 @@ await page.addInitScript(()=>{
  navigator.mediaDevices.getUserMedia=async()=>{const audio=new AudioContext();const source=audio.createOscillator(),gain=audio.createGain(),dest=audio.createMediaStreamDestination();gain.gain.value=0;source.connect(gain);gain.connect(dest);source.start();await audio.resume();return dest.stream;};
 });
 await page.goto(base);await page.getByRole('heading',{name:'정답까지의 과정을, 실력으로.'}).waitFor();
-await page.locator('[data-action="setup"]').first().click();await page.locator('#kind').selectOption('mock');await page.locator('#mode').selectOption('training');
-for(const c of await page.locator('[name="problem"]').all())await c.uncheck();await page.locator('[name="problem"][value="pair"]').check();await page.locator('[name="problem"][value="brackets"]').check();
+await page.locator('[data-action="setup"]').first().click();await page.locator('[name="kind"][value="mock"]').check({force:true});await page.locator('[name="mode"][value="training"]').check({force:true});
+for(const c of await page.locator('[name="problem"]').all())await c.uncheck({force:true});await page.locator('[name="problem"][value="pair"]').check({force:true});await page.locator('[name="problem"][value="brackets"]').check({force:true});
 await page.locator('#setup-model').selectOption('test-model');await page.locator('#setup-effort').selectOption('high');
 await page.locator('[data-action="start"]').click();await page.locator('#editor .monaco-editor').waitFor();
 await page.screenshot({path:'/tmp/lab-workspace.png',fullPage:true});
@@ -41,7 +41,7 @@ await page.waitForTimeout(400); // Capture a non-empty audio interval before sto
 await page.locator('[data-coach="voice"]').click();
 await page.getByText('음성을 알아듣지 못했어요. 다시 말하거나 글로 질문해 주세요.',{exact:true}).waitFor({timeout:60000});
 await page.screenshot({path:'/tmp/lab-inline-coach.png',fullPage:true});
-page.once('dialog',d=>d.accept());await page.locator('[data-action="finish"]').click();await page.getByRole('heading',{name:'Codex와 함께 복기'}).waitFor({timeout:30000});
+await page.locator('[data-action="finish"]').click();await page.locator('[data-confirm="ok"]').click();await page.getByRole('heading',{name:'Codex와 함께 복기'}).waitFor({timeout:30000});
 const sid=(await (await page.request.get(base+'/api/v2/dashboard')).json()).sessions[0].id;
 const s=await (await page.request.get(base+'/api/v2/session/'+sid)).json();assert.equal(s.status,'completed');assert.equal(s.runs.length,2);assert(s.events.some(e=>e.kind==='code'));assert(s.events.some(e=>e.kind==='switch'));assert(s.media.length>0);assert(s.media[0].bytes>0);
 await page.locator('#timeline').fill('1000');await page.locator('[data-action="frame"]').click();await page.getByText('00:01 장면 첨부됨',{exact:true}).waitFor({timeout:30000});

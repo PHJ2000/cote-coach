@@ -1,4 +1,5 @@
 import {makeRecorder,drain} from './recording.js';
+import {icon} from './ui.js';
 
 // A coach stays beside the editor; requests always belong to their original problem.
 export function createWorkspaceCoach({el,session,api,flush,record,waitJob,getPid,focusEditor,models=[]}) {
@@ -6,9 +7,9 @@ export function createWorkspaceCoach({el,session,api,flush,record,waitJob,getPid
  const drafts=new Map(),messages=[...(session.messages||[]).filter(m=>m.kind==='hint'),...(session.events||[]).filter(e=>e.kind==='note'&&e.payload.text).map(e=>({pid:e.pid,question:e.payload.text,answer:{message:'생각을 기록했어요.'}}))];
  let shown=getPid(),capture=null,voice=null,busy=false,disposed=false,voiceTask=null;
  const $=s=>el.querySelector(s);
- el.innerHTML=`<header class="inline-coach-header"><strong>${training?'풀이 코치':'생각 기록'}</strong><span>${training?'필요할 때 바로 물어보세요':'말한 생각은 녹음에 남아요'}</span></header>
+ el.innerHTML=`<header class="inline-coach-header"><div class="coach-title"><span class="coach-avatar">${icon(training?'spark':'pen',15)}</span><div><strong>${training?'풀이 코치':'생각 기록'}</strong><span>${training?'막히면 바로 물어보세요':'말한 생각은 녹음에 남아요'}</span></div></div></header>
  <div class="inline-coach-feed" role="log" aria-label="${training?'문제별 힌트 대화':'생각 메모'}"></div>
- <div class="inline-coach-compose"><label for="workspace-question">${training?'코드를 보면서 질문하기':'지금 떠오른 생각'}</label><textarea id="workspace-question" rows="3" maxlength="5000" placeholder="${training?'질문 없이 바로 힌트를 받아도 돼요.':'메모는 선택이에요. 말로 생각해도 녹음에 남아요.'}"></textarea><p class="inline-coach-status" role="status" aria-live="polite"></p><div class="inline-coach-buttons"><button type="button" class="button" data-coach="voice">${training?'◉ 말로 질문':'◉ 말로 메모'}</button>${training?'<button type="button" class="button primary" data-coach="hint">힌트 받기</button>':''}</div><button type="button" class="text-button inline-note" data-coach="note">메모만 남기기</button><small>${training?'현재 문제 · 코드 · 실행 결과를 함께 봐요. Ctrl+Enter로 질문':'실전 중에는 힌트를 제공하지 않아요.'}</small></div>`;
+ <div class="inline-coach-compose"><label for="workspace-question" class="sr-only">${training?'코드를 보면서 질문하기':'지금 떠오른 생각'}</label><div class="compose-box"><textarea id="workspace-question" rows="3" maxlength="5000" placeholder="${training?'무엇이 막혔나요? 비워 두고 힌트를 받아도 돼요.':'접근법, 막힌 이유를 짧게 남겨 보세요.'}"></textarea><div class="compose-foot"><button type="button" class="text-btn inline-note" data-coach="note">${icon('pen',13)} 메모만 남기기</button><span class="kbd-hint"><kbd>Ctrl</kbd><kbd>Enter</kbd></span></div></div><p class="inline-coach-status" role="status" aria-live="polite"></p><div class="inline-coach-buttons"><button type="button" class="btn" data-coach="voice">${training?'◉ 말로 질문':'◉ 말로 메모'}</button>${training?'<button type="button" class="btn primary" data-coach="hint">힌트 받기</button>':''}</div><small class="compose-note">${training?'현재 문제의 코드·실행 결과를 함께 전달해요.':'실전 중에는 힌트를 제공하지 않아요.'}</small></div>`;
  const modelSettings=document.createElement('details');modelSettings.className='inline-model-settings';
  const summary=document.createElement('summary'),modelSelect=document.createElement('select'),effortSelect=document.createElement('select');
  modelSelect.setAttribute('aria-label','힌트 모델');effortSelect.setAttribute('aria-label','힌트 추론 수준');
@@ -22,11 +23,11 @@ export function createWorkspaceCoach({el,session,api,flush,record,waitJob,getPid
   if(disposed)return;
   feed.replaceChildren();
   const list=messages.filter(m=>m.pid===shown);
-  if(!list.length){const p=document.createElement('p');p.className='inline-coach-empty';p.textContent=training?'막히면 여기서 바로 힌트를 받아요. 코드와 실행 결과는 자동으로 전달돼요.':'풀이에 집중하세요. 접근법이나 막힌 이유를 말하면 화면과 함께 기록돼요.';feed.append(p);}
-  for(const m of list){const item=document.createElement('article');item.className='inline-coach-message';if(m.question){const q=document.createElement('p');q.className='inline-coach-question';q.textContent=m.question;item.append(q);}const answer=document.createElement('p');answer.textContent=m.answer.message;item.append(answer);feed.append(item);}
+  if(!list.length){const p=document.createElement('div');p.className='inline-coach-empty';p.innerHTML=training?`${icon('bulb',20)}<strong>막히면 여기서 힌트를 받아요</strong><span>코드와 최근 실행 결과가 자동으로 함께 전달돼요. 답을 주기보다 다음 한 걸음을 짚어줘요.</span>`:`${icon('mic',20)}<strong>풀이에 집중하세요</strong><span>접근법을 정할 때, 막혔을 때 생각을 말하면 화면과 함께 기록돼요.</span>`;feed.append(p);}
+  for(const m of list){const item=document.createElement('article');item.className='inline-coach-message';if(m.question){const q=document.createElement('p');q.className='inline-coach-question';q.textContent=m.question;item.append(q);}const answer=document.createElement('p');answer.className='inline-coach-answer'+(m.answer.message==='생각을 기록했어요.'?' is-note':'');answer.textContent=m.answer.message;item.append(answer);feed.append(item);}
   feed.scrollTop=feed.scrollHeight;
  }
- function controls(){if(disposed)return;for(const b of el.querySelectorAll('[data-coach]'))b.disabled=busy;const b=$('[data-coach="voice"]');b.textContent=voice?(training?'■ 말 마침 · 힌트 받기':'■ 말 마침 · 메모 저장'):(training?'◉ 말로 질문':'◉ 말로 메모');if(voice){$('[data-coach="hint"]')?.setAttribute('disabled','');$('[data-coach="note"]').disabled=true;}}
+ function controls(){if(disposed)return;for(const b of el.querySelectorAll('[data-coach]'))b.disabled=busy;const b=$('[data-coach="voice"]');b.classList.toggle('recording',!!voice);b.textContent=voice?(training?'■ 말 마침 · 힌트 받기':'■ 말 마침 · 메모 저장'):(training?'◉ 말로 질문':'◉ 말로 메모');if(voice){$('[data-coach="hint"]')?.setAttribute('disabled','');$('[data-coach="note"]').disabled=true;}}
  function saveNote(message,problem){record('note',{text:message},problem);messages.push({pid:problem,question:message,answer:{message:'생각을 기록했어요.'}});render();}
  async function ask(message=text.value.trim(),problem=shown){
   if(busy||voice||!training)return;
