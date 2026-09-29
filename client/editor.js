@@ -3,6 +3,17 @@ import {memberBoundary,memberTemplates,rankCompletion} from './java-completion.j
 import {normalizeCompletionList,textRange,completionRange,markdown} from './lsp-completion.js';
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api.js';
 import 'monaco-editor/esm/vs/basic-languages/java/java.contribution.js';
+// Monaco's basic Java configuration only knows bracket pairs. Native temporary
+// indentation also restores the parent indent after an unbraced statement,
+// without intercepting Enter, breaking undo, or waiting for a JDT response.
+monaco.languages.setLanguageConfiguration('java',{
+ indentationRules:{
+  // The prefix consumes quoted literals as a whole: '{' and "//" are not code.
+  increaseIndentPattern:/^(?:[^"'\/]|\/(?![/*])|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\/\*.*?\*\/)*(?:\{[^}"'\/]*|\([^)"'\/]*|\[[^\]"'\/]*)(?:\/\/.*|\/\*.*?\*\/\s*)?$/,
+  decreaseIndentPattern:/^\s*[}\])]/,
+  indentNextLinePattern:/^\s*(?:(?:if|for|while)\s*\(.*\)|else(?:\s+if\s*\(.*\))?|do)\s*(?:\/\/.*|\/\*.*\*\/\s*)?$/
+ }
+});
 self.MonacoEnvironment={getWorker(){return new Worker('/dist/editor.worker.js',{type:'module'});}};
 const suggestDark={'editorSuggestWidget.background':'#16181d','editorSuggestWidget.border':'#2b2f38',
  'editorSuggestWidget.foreground':'#c9cdd6','editorSuggestWidget.selectedBackground':'#262a33',
