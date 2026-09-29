@@ -13,14 +13,16 @@ from pathlib import Path
 from . import store as st
 from .problems import BUILTINS, public_problem, validate_problem
 from .java import run_java
-from .codex import CodexCoach
+from .codex import CodexCoach, SYSTEM, SCHEMA, validate_report
 from .speech import Speech
 from .ide import JavaIDE
+from .evidence import code_evolution, conversations, hint_followups, transcript_evidence
 
 class Lab:
     def __init__(self):
         st.init();self.codex=CodexCoach(st.DATA);self.speech=Speech(st.ROOT);self.ide=JavaIDE(st.ROOT,st.DATA)
         self.jobs={};self.jobs_lock=threading.Lock();self.timers={};self.deadline_lock=threading.Lock();self.media_lock=threading.Lock()
+        self.transcription_lock=threading.Lock()
         for s in st.sessions():
             if s['status']=='active':self.schedule(s)
     def all_problems(self):
@@ -227,12 +229,61 @@ class Lab:
         frame={'ms':ms,'path':str(target.relative_to(st.DATA))}
         st.mutate(sid,lambda s:s.setdefault('frames',[]).append(frame))
         return {'ms':ms}
+    def prepare_transcripts(self,sid,progress,cancel,force=False):
+        # One preparation at a time also prevents a manual transcription racing
+        # the automatic analysis preparation and replacing the same transcript.
+        with self.transcription_lock:
+            s=st.session(sid)
+            if s['status']=='active':raise ValueError('연습 종료 후 전사할 수 있습니다.')
+            groups=[g for g in self.media_groups(sid) if g['kind']=='screen']
+            signature=hashlib.sha256(st.dump([(g['segment'],g['chunks'],g['bytes']) for g in groups]).encode()).hexdigest()
+            state=s.get('transcription_state',{})
+            if not force and (state.get('source')=='user' or (s['transcripts'] and not state)):
+                return s['transcripts']
+            if not force and state.get('signature')==signature and state.get('status') in {'completed','no_speech'}:
+                return s['transcripts']
+            state={'signature':signature,'source':'automatic','updated':st.now()}
+            output=[]
+            try:
+                if not groups:
+                    state.update(status='missing',detail='녹음이 없어 코드·실행 기록으로 분석합니다.')
+                elif any(not g['complete_sequence'] for g in groups):
+                    state.update(status='incomplete',detail='녹화 조각이 누락되어 음성을 분석에 포함하지 못했습니다.')
+                else:
+                    for i,g in enumerate(groups):
+                        if cancel.is_set():raise InterruptedError('분석 준비가 취소되었습니다.')
+                        progress(f'녹음 {i+1}/{len(groups)}개를 이 컴퓨터에서 전사하고 있어요…')
+                        path,_=self.media_file(sid,'screen',g['segment'])
+                        segments=self.speech.transcribe(path)
+                        output.extend([x|{'start_ms':x['start_ms']+g['start_ms'],'end_ms':x['end_ms']+g['start_ms'],'segment':g['segment']} for x in segments])
+                    state.update(status='completed' if output else 'no_speech',
+                                 detail=f'음성 전사 {len(output)}구간.' if output else '전사를 완료했지만 인식된 발화가 없습니다.')
+            except InterruptedError:raise
+            except Exception as exc:
+                state.update(status='failed',detail='음성 전사 실패: '+str(exc)[:400])
+            if cancel.is_set():raise InterruptedError('분석 준비가 취소되었습니다.')
+            def save(current):
+                # Do not overwrite edits submitted while Whisper was running.
+                if current.get('transcription_state',{}).get('source')=='user':return
+                current['transcription_state']=state
+                if state['status'] in {'completed','no_speech'}:current['transcripts']=output
+            st.mutate(sid,save)
+            return st.session(sid)['transcripts']
+    def save_transcripts(self,sid,segments):
+        st.mutate(sid,lambda s:s.update(transcripts=segments,transcription_state={
+            'status':'completed' if segments else 'no_speech','source':'user','updated':st.now(),
+            'detail':'사용자가 확인·수정한 전사문을 사용합니다.'}))
     def transcribe(self,sid,kind='screen',segment=None):
         s=st.session(sid)
         if kind=='screen' and s['status']=='active':raise ValueError('연습 종료 후 전사할 수 있습니다.')
         groups=[g for g in self.media_groups(sid) if g['kind']==kind and (segment is None or g['segment']==segment)]
         if not groups:raise ValueError('녹음이 없습니다. 녹화 업로드가 완료됐는지 확인하세요.')
         def work(progress,cancel):
+            if kind=='screen':
+                output=self.prepare_transcripts(sid,progress,cancel,force=True)
+                state=st.session(sid).get('transcription_state',{})
+                if state.get('status') in {'failed','incomplete'}:raise ValueError(state['detail'])
+                return {'segments':output,'text':' '.join(x['text'] for x in output)}
             output=[]
             for g in groups:
                 if cancel.is_set():raise ValueError('전사 취소됨')
@@ -253,10 +304,22 @@ class Lab:
                 bucket['payload']['changes']+=1;bucket['payload']['last_ms']=e['ms'];bucket['payload']['characters']=len(e['payload']['code']);continue
             payload=dict(e['payload'])
             if e['kind'] in {'run','submit'}:payload.pop('code',None)
-            timeline.append({'ms':e['ms'],'kind':e['kind'],'pid':e['pid'],'payload':payload})
+            timeline.append({'id':e['id'],'ms':e['ms'],'kind':e['kind'],'pid':e['pid'],'payload':payload})
         timeline.extend(edit_bins.values());timeline.sort(key=lambda e:e['ms'])
         past=[{'title':x['title'],'report':x['report']} for x in st.sessions() if x['id']!=sid and x.get('report')][:5]
-        return {'settings':{k:s[k] for k in ['mode','kind','duration','resources','started','ended']},'problems':[public_problem(p) for p in s['problems']],'current_code':s['codes'],'deadline_code':s['deadline_codes'],'runs':s['runs'],'timeline':timeline,'metrics':self.metrics(s),'coverage':{'raw_event_count':len(events),'sent_event_count':len(timeline),'edit_detail':'수정 활동은 15초 단위로 집계. 실제 실행·제출 코드 스냅샷과 최종 코드를 제공. 모든 개별 수정 이력은 로컬에서 재생 가능.'}, 'transcripts':s['transcripts'],'recording':self.media_groups(sid),'past_reports':past,'attached_frame_times':[x['ms'] for x in s.get('frames',[])],'note':'영상 원본은 직접 입력되지 않음. 코드 이력·전사문·이벤트 기반 분석. 읽지 않은 영상을 봤다고 말하지 말 것.'}
+        evolution=[] if hint else code_evolution(s,events)
+        return {'settings':{k:s[k] for k in ['mode','kind','duration','resources','started','ended']},'problems':[public_problem(p) for p in s['problems']],'current_code':s['codes'],'deadline_code':s['deadline_codes'],'runs':s['runs'],'timeline':timeline,'metrics':self.metrics(s),'code_evolution':evolution,'conversations':conversations(s),'hint_followups':hint_followups(s,events),'coverage':{'raw_event_count':len(events),'sent_event_count':len(timeline),'raw_code_events':sum(e['kind']=='code' for e in events),'code_checkpoints':len(evolution),'edit_detail':'처음·마지막, 2초 이상 입력 간격, 15초 구간 마지막, 실행·힌트 전후의 코드 차이를 전달. 중간 개별 편집은 원본 이벤트에 보존. 입력 간격은 사고 시간의 측정값이 아님.'}, 'transcripts':transcript_evidence(s),'transcription_state':s.get('transcription_state',{'status':'provided' if s['transcripts'] else 'not_prepared'}),'recording':self.media_groups(sid),'past_reports':past,'attached_frame_times':[x['ms'] for x in s.get('frames',[])],'note':'영상 원본은 직접 입력되지 않음. 코드 차이·전사문·이벤트 기반 분석. 실행 시각과 코드 수정 시각을 구분하고, 수정 간격을 사고 시간으로 단정하지 말 것.'}
+    def export_evidence(self,sid):
+        s=st.session(sid)
+        inputs=[];root=(st.DATA/'sessions'/sid/'analysis').resolve()
+        for meta in s.get('analysis_inputs',[]):
+            path=(st.DATA/meta['path']).resolve()
+            if path.is_relative_to(root) and path.is_file():inputs.append(json.loads(path.read_text(encoding='utf-8')))
+            else:inputs.append(meta|{'error':'분석 입력 원본 파일 없음'})
+        return self.evidence(sid)|{'export_version':2,'session_id':sid,'exported_at':st.now(),
+            'model':s['model'],'effort':s['effort'],'report':s.get('report'),
+            'messages':s['messages'],'report_history':s.get('report_history',[]),
+            'analysis_inputs':inputs,'events':st.events(sid)}
     def chat(self,sid,d):
         s=st.session(sid);kind=d.get('kind');message=d.get('message','')
         if kind not in {'analyze','reply','report','hint'} or not isinstance(message,str) or len(message)>20000:raise ValueError('복기 요청 형식을 확인하세요.')
@@ -264,20 +327,39 @@ class Lab:
         if kind!='hint' and s['status']!='completed':raise ValueError('풀이를 종료한 뒤 복기하세요.')
         model=d.get('model');effort=d.get('effort')
         if not isinstance(model,str) or not isinstance(effort,str) or not model or not effort:raise ValueError('모델과 추론 수준을 선택하세요.')
-        prompt={'task':{'analyze':'근거를 확인하고 첫 복기 질문을 해줘. 아직 최종 보고서는 만들지 마.','reply':'학습자의 복기 답변을 반영해서 필요하면 추가 확인 질문을 해줘.','report':'복기 답변을 반영하여 최종 보고서를 작성해줘. report 필드를 채워줘.','hint':'현재 문제에 대해 정답 코드 없이 작은 힌트 하나만 줘.'}[kind],'user_answer':message,'current_problem':d.get('pid')}
-        if kind in {'analyze','hint'} or not s['thread']:prompt['evidence']=self.evidence(sid,kind=='hint')
-        if kind=='report':prompt['evidence']=self.evidence(sid)
-        # All raw history remains on disk; exceptionally large sessions are explicitly limited.
-        raw=st.dump(prompt)
-        if len(raw)>500000:
-            evidence=prompt.get('evidence',{});timeline=evidence.get('timeline',[]);code_events=[e for e in timeline if e['kind']=='code'];evidence['timeline']=[e for e in timeline if e['kind']!='code']+code_events[-40:];evidence['coverage_note']='긴 세션: 최근 코드 변경 40개와 실행 스냅샷을 포함. 나머지 코드 변경은 원본 기록에 보존됨.';raw=st.dump(prompt)
-        if len(raw)>750000:raise ValueError('분석 자료가 너무 큽니다. 문제별로 더 짧은 세션을 분석해 주세요. 원본은 보존됩니다.')
         def work(progress,cancel):
-            answer,usage,thread=self.codex.chat(s['thread'],model,effort,raw,progress,cancel,lambda thread:st.mutate(sid,lambda s:s.update(thread=thread)),images=[str(st.DATA/x['path']) for x in s.get('frames',[])])
-            entry={'id':uuid.uuid4().hex,'kind':kind,'pid':d.get('pid'),'question':message,'answer':answer,'at':st.now(),'model':model,'effort':effort,'usage':usage}
+            if kind!='hint':self.prepare_transcripts(sid,progress,cancel)
+            if cancel.is_set():raise InterruptedError('분석이 취소되었습니다.')
+            current=st.session(sid)
+            prompt={'task':{'analyze':'근거를 확인하고 첫 복기 질문을 해줘. 아직 최종 보고서는 만들지 마.','reply':'학습자의 복기 답변을 반영해서 필요하면 추가 확인 질문을 해줘.','report':'복기 답변을 반영하여 최종 보고서를 작성해줘. report 필드를 채워줘. 풀이 과정과 교정 우선순위, 성공 기준이 있는 훈련 계획을 작성해줘.','hint':'현재 문제에 대해 정답 코드 없이 작은 힌트 하나만 줘.'}[kind],
+                    'user_answer':message,'current_problem':d.get('pid'),'evidence':self.evidence(sid,kind=='hint')}
+            if kind=='reply' and current.get('report'):prompt['current_report']=current['report']
+            raw=st.dump(prompt)
+            if len(raw)>750000:raise ValueError('분석 자료가 너무 큽니다. 원본은 보존되며, 이 요청에서는 일부 기록만 몰래 잘라 분석하지 않았습니다.')
+            request_id=uuid.uuid4().hex
+            folder=st.DATA/'sessions'/sid/'analysis';folder.mkdir(parents=True,exist_ok=True)
+            path=folder/(request_id+'.json')
+            audit={'id':request_id,'kind':kind,'created':st.now(),'model':model,'effort':effort,
+                   'prompt_version':2,'input':prompt,'instructions':SYSTEM,'schema':SCHEMA,
+                   'image_times':prompt['evidence']['attached_frame_times']}
+            path.write_text(st.dump(audit),encoding='utf-8')
+            metadata={k:audit[k] for k in ['id','kind','created','model','effort','prompt_version']}
+            metadata['path']=str(path.relative_to(st.DATA))
+            st.mutate(sid,lambda s:s.setdefault('analysis_inputs',[]).append(metadata))
+            progress('코드 변화·실행 결과·힌트와 음성 기록을 함께 분석하고 있어요…')
+            thread_key='thread' if kind=='hint' else 'review_thread'
+            answer,usage,thread=self.codex.chat(current.get(thread_key),model,effort,raw,progress,cancel,
+                lambda thread:st.mutate(sid,lambda s:s.update({thread_key:thread})),
+                images=[str(st.DATA/x['path']) for x in current.get('frames',[])])
+            (folder/(request_id+'-response.json')).write_text(st.dump({'answer':answer,'usage':usage}),encoding='utf-8')
+            if kind=='report':validate_report(answer.get('report'),prompt['evidence'])
+            entry={'id':uuid.uuid4().hex,'kind':kind,'pid':d.get('pid'),'question':message,'answer':answer,
+                   'at':st.now(),'model':model,'effort':effort,'usage':usage,'analysis_input_id':request_id}
             def save(s):
+                if kind=='report' and answer.get('report'):
+                    if s.get('report'):s.setdefault('report_history',[]).append({'replaced_at':entry['at'],'report':s['report']})
+                    s['report']=answer['report']
                 s['messages'].append(entry);s['model']=model;s['effort']=effort
-                if kind=='report' and answer.get('report'):s['report']=answer['report']
             st.mutate(sid,save);st.event(sid,'hint' if kind=='hint' else 'coach',{'message_id':entry['id'],'kind':kind},d.get('pid',''))
             return entry
         return self.job(sid,'codex',work)

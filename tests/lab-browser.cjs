@@ -45,12 +45,12 @@ await page.locator('[data-action="finish"]').click();await page.locator('[data-c
 const sid=(await (await page.request.get(base+'/api/v2/dashboard')).json()).sessions[0].id;
 const s=await (await page.request.get(base+'/api/v2/session/'+sid)).json();assert.equal(s.status,'completed');assert.equal(s.runs.length,2);assert(s.events.some(e=>e.kind==='code'));assert(s.events.some(e=>e.kind==='switch'));assert(s.media.length>0);assert(s.media[0].bytes>0);
 await page.locator('#timeline').fill('1000');await page.locator('[data-action="frame"]').click();await page.getByText('00:01 장면 첨부됨',{exact:true}).waitFor({timeout:30000});
-await page.locator('[data-action="transcribe"]').click();await page.locator('[data-action="transcribe"]').filter({hasText:'음성 전사'}).waitFor();await page.waitForFunction(()=>!document.querySelector('[data-action="transcribe"]').disabled,{timeout:60000});
-await page.locator('[data-action="analyze"]').click();await page.getByText('처음 어떤 접근을 생각했나요?',{exact:true}).waitFor({timeout:15000});
+// Analysis automatically prepares the recorded audio before requesting coaching.
+await page.locator('[data-action="analyze"]').click();await page.getByText('처음 어떤 접근을 생각했나요?',{exact:true}).waitFor({timeout:90000});
 await page.locator('#reply').fill('중복 원소를 고려해서 이전에 본 값만 집합에 넣었어요.');await page.locator('[data-action="reply"]').click();await page.waitForFunction(()=>!document.querySelector('[data-action="reply"]').disabled);
 await page.locator('[data-action="report"]').click();await page.getByRole('heading',{name:'이번 연습에서 다음 연습으로'}).waitFor();
 await page.screenshot({path:'/tmp/lab-review.png',fullPage:true});
-const checked=await (await page.request.get(base+'/api/v2/session/'+sid)).json();assert(checked.report);assert.equal(checked.messages.at(-1).effort,'high');assert.equal(checked.messages.at(-1).model,'test-model');assert.equal(checked.frames.length,1);
+const checked=await (await page.request.get(base+'/api/v2/session/'+sid)).json();assert.equal(checked.report.version,2);assert(['completed','no_speech'].includes(checked.transcription_state.status));assert.equal(checked.messages.at(-1).effort,'high');assert.equal(checked.messages.at(-1).model,'test-model');assert.equal(checked.frames.length,1);
 await page.reload();await page.locator(`[data-session="${sid}"]`).first().click();await page.getByRole('heading',{name:'이번 연습에서 다음 연습으로'}).waitFor();
 await page.locator('[data-action="review-home"]').click();await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/lab-mobile.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
 assert.deepEqual(errors,[]);console.log('PASS: start mock training, media capture+upload, Java edit/run/submit, switching, hint, timeline, frame extraction, local STT, debrief+report, explicit model/effort, reload persistence, mobile. Codex inference mocked; Java/media/STT real.');

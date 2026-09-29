@@ -10,16 +10,46 @@ SYSTEM='''너는 한국어 코딩테스트 코치다. 목적은 학습자의 독
 제공된 자료만 분석하라. 도구 호출, 파일 접근, 쉘 실행, 웹 검색, 하위 에이전트는 하지 마라.
 관찰 사실과 원인 가설을 구분하고, 실제 기록에 존재하는 시각(ms)을 근거로 제시하라.
 기록이 없거나 불완전하면 명시하라. 침묵·포커스 이탈로 사고 중단·부정행위를 판단하지 마라.
-첫 분석은 핵심 복기 질문 1~3개만 제시하고 report는 null로 둬라. 사용자의 답을 받은 뒤에도 추가 확인이 필요하면 질문하라.
-최종 보고서를 요청받으면 관찰-가설-교정 행동을 정리하라. 유형 태그는 제공된 문제 유형 중 선택하라.
-기본적으로 정답 코드와 전체 해설을 노출하지 마라. 힌트 요청은 작은 힌트 하나만 제공하라.
+task를 구분하라. 힌트는 정답 코드 없이 작은 힌트 하나만 짧게 제공하고 report는 null로 둬라.
+첫 분석은 기록에서 갈리는 원인 가설을 확인할 질문 1~3개만 제시하고 report는 null로 둬라.
+최종 보고서는 간단한 코드 리뷰가 아니라 다음 훈련에 사용할 학습 진단이다. 힌트의 분량 제한을 적용하지 마라.
+code_evolution의 시간순 코드 차이, 실행 결과, conversations, hint_followups, 전사문을 교차 확인하라.
+process_review에 중요한 전환 3~6개를 시간순으로 설명하라. 무엇을 시도했고 무엇이 달라졌는지, 실행 근거에 맞춘 수정인지 설명하라.
+Java 문법/API, 접근법·자료구조, 문제 이해, 반례 검증, 디버깅, 시간 운영을 구분하되 자료가 없는 항목은 채우지 마라.
+힌트 이전/이후 변경이 실제 있었는지 확인하라. 변경이 없거나 힌트 직후 제출했다는 사실만으로 이해 여부를 단정하지 마라.
+입력 표기·편집기 등 도구 혼동 가능성도 기록과 맞으면 별도 가설로 다루고 알고리즘 능력 문제로 몰지 마라.
+weaknesses는 중복 증상을 묶어 중요도 순으로 최대 3개. priority 1이 최우선이다. tag는 문제 유형, skill은 교정할 능력이다.
+각 항목에 코드/실행/발언 근거, 원인 가설, 다음 행동을 구체적으로 적고 evidence_ids에는 제공된 id만 사용하라.
+evidence_ms와 process_review의 시각은 제공된 기록의 실제 시각이어야 한다. 본문 시각은 밀리초 숫자 대신 분:초로 표현하라.
+practice_plan은 우선순위와 연결된 1~3개 훈련으로, 무엇을 얼마나 연습하고 어떤 결과면 성공인지, 새 문제에서 어떻게 재확인할지 적어라.
+복기 답변이 없어도 직접 관찰 가능한 행동과 교정 방법을 충분히 설명하되 동기/이해에 관한 가설은 미확인으로 남겨라.
+past_reports와 비교할 때 같은 문제 재풀이의 변화와 다른 문제로 일반화한 실력 상승을 구분하라.
+최종 보고서에서는 오류 원리, 작은 반례, 짧은 부분 코드 설명을 허용한다. 완성 정답 코드로 훈련을 대체하지 마라.
+summary는 지금 우선 고칠 핵심을 먼저 설명하라. 자료 누락은 limitations에 모으고 같은 면책 문구를 반복하지 마라.
+transcription_state가 completed여도 자동 전사 오류 가능성을 고려하라. missing/failed/incomplete/no_speech는 서로 다른 상태다.
 실전/훈련, 자료 허용, 시간 내/추가시간 성과를 구분하라. 실력 상승과 성격을 단정하지 마라.
-짧고 구체적으로 답하고 요청된 JSON 구조를 지켜라.'''
+근거 없는 칭찬이나 분량 채우기를 피하고 요청된 JSON 구조를 지켜라.'''
 
 def obj(props):return {'type':'object','properties':props,'required':list(props),'additionalProperties':False}
 S={'type':'string'};NUM={'type':'integer','minimum':0}
-REPORT=obj({'summary':S,'strengths':{'type':'array','items':S},'weaknesses':{'type':'array','items':obj({'tag':S,'observation':S,'hypothesis':S,'evidence_ms':NUM,'confidence':{'type':'string','enum':['낮음','보통','높음']},'next_action':S})},'next_practice':{'type':'array','items':S}})
+STRINGS={'type':'array','items':S}
+REPORT=obj({'version':{'type':'integer','enum':[2]},'summary':S,'strengths':STRINGS,
+ 'process_review':{'type':'array','items':obj({'stage':S,'start_ms':NUM,'end_ms':NUM,'observation':S,'interpretation':S,'evidence_ids':STRINGS})},
+ 'weaknesses':{'type':'array','items':obj({'priority':{'type':'integer','minimum':1,'maximum':3},'skill':S,'tag':S,'observation':S,'hypothesis':S,'evidence_ms':NUM,'evidence_ids':STRINGS,'confidence':{'type':'string','enum':['낮음','보통','높음']},'next_action':S})},
+ 'practice_plan':{'type':'array','items':obj({'target':S,'exercise':S,'minutes':{'type':'integer','minimum':1,'maximum':120},'success_criteria':S,'transfer_check':S})},
+ 'progress_comparison':S,'limitations':STRINGS,'next_practice':STRINGS})
 SCHEMA=obj({'message':S,'questions':{'type':'array','items':obj({'question':S,'ms':NUM})},'report':{'anyOf':[REPORT,{'type':'null'}]}})
+
+def validate_report(report,evidence):
+    if not isinstance(report,dict):raise ValueError('최종 보고서가 반환되지 않았습니다. 기존 보고서는 보존됩니다.')
+    if report.get('version')!=2:return # Older stored reports remain readable.
+    records=[*evidence.get('timeline',[]),*evidence.get('code_evolution',[]),*evidence.get('runs',[]),*evidence.get('conversations',[]),*evidence.get('transcripts',[])]
+    times={r[k] for r in records for k in ('ms','start_ms','end_ms') if k in r};ids={r['id'] for r in records if r.get('id')}
+    for item in report['weaknesses']+report['process_review']:
+        refs=item.get('evidence_ids',[])
+        if not refs or any(ref not in ids for ref in refs):raise ValueError('보고서에 기록으로 확인할 수 없는 근거가 있어 저장하지 않았습니다.')
+        stamps=[item['evidence_ms']] if 'evidence_ms' in item else [item['start_ms'],item['end_ms']]
+        if any(ms not in times for ms in stamps) or stamps!=sorted(stamps):raise ValueError('보고서의 근거 시각이 원본 기록과 일치하지 않아 저장하지 않았습니다.')
 
 class CodexCoach:
     def __init__(self,data):

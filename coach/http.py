@@ -46,7 +46,7 @@ def get(h,lab,path):
         elif path.startswith('/api/v2/media/'):
             _,_,_,_,sid,kind,segment=path.split('/');file,mime=lab.media_file(sid,kind,segment);stream_file(h,file,mime);return True
         elif path.startswith('/api/v2/evidence/'):
-            sid=path.rsplit('/',1)[-1];result=lab.evidence(sid)
+            sid=path.rsplit('/',1)[-1];result=lab.export_evidence(sid)
         elif path=='/api/v2/backup':
             with tempfile.TemporaryDirectory() as temp:
                 import sqlite3
@@ -91,7 +91,7 @@ def post(h,lab,path):
                 if not isinstance(d.get('segments'),list) or len(d['segments'])>20000:raise ValueError('전사문 형식 오류')
                 for segment in d['segments']:
                     if type(segment.get('start_ms')) is not int or type(segment.get('end_ms')) is not int or not 0<=segment['start_ms']<=segment['end_ms']<=86400000 or not isinstance(segment.get('text'),str) or len(segment['text'])>5000:raise ValueError('전사문 시간·내용을 확인하세요.')
-                st.mutate(d['sid'],lambda s:s.update(transcripts=d['segments']));result={'saved':True}
+                lab.save_transcripts(d['sid'],d['segments']);result={'saved':True}
             elif path=='/api/v2/chat':result=lab.chat(d['sid'],d)
             elif path=='/api/v2/cancel':
                 job=lab.get_job(d['job_id']);cancel=lab.jobs.get(d['job_id'])
