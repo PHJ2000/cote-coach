@@ -1,0 +1,17 @@
+{
+  "name": "cote-practice-lab",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "test:browser": "node tests/lab-browser.cjs"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.55.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "playwright": "^1.58.0"
+  },
+  "type": "module"
+}

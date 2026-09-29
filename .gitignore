@@ -1,0 +1,14 @@
+.env
+data/
+__pycache__/
+*.pyc
+node_modules/
+test-results/
+.venv/
+runtime/
+static/dist/
+.env.*
+!.env.example
+practice-*.json
+/docs/collaboration/*
+!/docs/collaboration/BACKEND-BRIDGE.md
