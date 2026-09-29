@@ -6,7 +6,7 @@ import 'monaco-editor/esm/vs/basic-languages/java/java.contribution.js';
 self.MonacoEnvironment={getWorker(){return new Worker('/dist/editor.worker.js',{type:'module'});}};
 const suggestDark={'editorSuggestWidget.background':'#16181d','editorSuggestWidget.border':'#2b2f38',
  'editorSuggestWidget.foreground':'#c9cdd6','editorSuggestWidget.selectedBackground':'#262a33',
- 'editorSuggestWidget.selectedForeground':'#eef0f4','editorSuggestWidget.highlightForeground':'#f2b544',
+ 'editorSuggestWidget.selectedForeground':'#eef0f4','editorSuggestWidget.selectedIconForeground':'#eef0f4','list.activeSelectionForeground':'#eef0f4','list.activeSelectionIconForeground':'#eef0f4','list.hoverBackground':'#1e2128','editorSuggestWidget.highlightForeground':'#f2b544',
  'editorSuggestWidget.focusHighlightForeground':'#f2b544','editorSuggestWidgetStatus.foreground':'#8b919d',
  'editorHoverWidget.background':'#16181d','editorHoverWidget.border':'#2b2f38'};
 monaco.editor.defineTheme('practice-dark',{base:'vs-dark',inherit:true,rules:[{token:'comment',foreground:'6b7280',fontStyle:'italic'},{token:'keyword',foreground:'f2a65a'},{token:'string',foreground:'9ece6a'},{token:'number',foreground:'e0af68'},{token:'type',foreground:'7dcfff'}],colors:{
@@ -19,7 +19,12 @@ monaco.editor.defineTheme('practice-light',{base:'vs',inherit:true,rules:[{token
  'editor.background':'#fffefb','editorGutter.background':'#fffefb','editor.lineHighlightBackground':'#f6f3ec','editor.lineHighlightBorder':'#00000000',
  'editorLineNumber.foreground':'#b9b5ab','editorLineNumber.activeForeground':'#3b3d42','editorCursor.foreground':'#b77905',
  'editor.selectionBackground':'#e9a52933','editorIndentGuide.background1':'#eeebe3','editorBracketMatch.background':'#e9a52922','editorBracketMatch.border':'#e9a52977',
- 'editorSuggestWidget.highlightForeground':'#a86b00','editorSuggestWidget.focusHighlightForeground':'#a86b00','editorSuggestWidget.selectedBackground':'#f1ece1'
+ 'editorSuggestWidget.background':'#ffffff','editorSuggestWidget.border':'#d8d3c8','editorSuggestWidget.foreground':'#2a2c31',
+ 'editorSuggestWidget.selectedBackground':'#fbe6bb','editorSuggestWidget.selectedForeground':'#18191d','editorSuggestWidget.selectedIconForeground':'#18191d',
+ 'editorSuggestWidget.highlightForeground':'#a15c00','editorSuggestWidget.focusHighlightForeground':'#8a4b00','editorSuggestWidgetStatus.foreground':'#6b707a',
+ 'list.activeSelectionForeground':'#18191d','list.activeSelectionIconForeground':'#18191d','list.hoverBackground':'#f6f1e6','list.hoverForeground':'#18191d',
+ 'editorHoverWidget.background':'#ffffff','editorHoverWidget.border':'#d8d3c8','editorHoverWidget.foreground':'#2a2c31',
+ 'editorWidget.background':'#ffffff','editorWidget.border':'#d8d3c8','editorWidget.foreground':'#2a2c31'
 }});
 const themeName=()=>document.documentElement.dataset.theme==='light'?'practice-light':'practice-dark';
 export function syncEditorTheme(){monaco.editor.setTheme(themeName());}
