@@ -1,0 +1,52 @@
+/* Scoped to retry panels; inherits the existing application design tokens. */
+.retry-panel{margin:0 0 20px;padding:22px;border:1px solid var(--line,#2f343e);border-radius:var(--r,10px);background:var(--surface,#14161b);color:var(--text,#eceef2)}
+.retry-panel h2{margin:0 0 6px;font-size:17px;font-weight:650}
+.retry-panel h3{margin:0;font-size:14px;font-weight:650}
+.retry-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.retry-note{margin:6px 0;color:var(--text-2,#a7adb8);font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+.retry-status{margin:10px 0;font-size:13px;line-height:1.7;overflow-wrap:anywhere}
+.retry-cards{list-style:none;margin:0;padding:0}
+.retry-card{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:16px 0;border-top:1px solid var(--line,#2f343e)}
+.retry-card-main{min-width:0;flex:1}
+.retry-card-title{display:flex;align-items:center;flex-wrap:wrap;gap:9px}
+.retry-card-title h3{overflow-wrap:anywhere}
+.retry-card-actions{display:flex;align-items:flex-end;flex-direction:column;gap:5px;max-width:240px}
+.retry-card-actions .retry-note{text-align:right}
+.retry-state{padding:5px 8px;border-radius:5px;background:var(--surface-3,#21252d);color:var(--text-2,#a7adb8);white-space:nowrap;font-size:12px}
+.retry-state-grading{background:var(--info-soft,rgba(111,168,255,.12));color:var(--info,#6fa8ff)}
+.retry-state-unavailable{background:var(--fail-soft,rgba(244,113,113,.12));color:var(--fail,#f47171)}
+.retry-upcoming{margin-top:12px}
+.retry-upcoming summary{width:fit-content;padding:7px 2px;cursor:pointer;color:var(--text-2,#a7adb8);font-size:13px}
+.retry-registration h3{margin-bottom:14px}
+.retry-field{display:flex;flex-direction:column;gap:7px;margin:14px 0}
+.retry-field>label{font-size:13px;font-weight:600}
+.retry-field textarea,.retry-field input[type=text]{width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--line-2,#2f343e);border-radius:var(--r-sm,6px);background:var(--surface-2,#1a1d23);color:inherit;font:inherit;line-height:1.6}
+.retry-field textarea{resize:vertical;min-height:82px}
+.retry-field [aria-invalid=true]{border-color:var(--fail,#f47171)}
+.retry-counter{align-self:flex-end;font-size:12px;color:var(--text-2,#a7adb8)}
+.retry-confirm{display:flex;align-items:center;gap:8px;font-size:12px;line-height:1.6}
+.retry-confirm input{flex:none}
+.retry-dates{display:flex;flex-wrap:wrap;gap:10px;list-style:none;margin:14px 0;padding:0}
+.retry-dates li{flex:1;min-width:105px;display:flex;flex-direction:column;gap:5px;padding:11px 12px;border:1px solid var(--line,#2f343e);border-radius:var(--r-sm,6px);font-size:12px}
+.retry-dates strong{color:var(--accent-text,#f5c46a)}
+.retry-reason{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.7;margin:14px 0}
+.retry-table-wrap{overflow-x:auto;margin:14px 0}
+.retry-table{width:100%;border-collapse:collapse;font-size:12px}
+.retry-table caption{text-align:left;color:var(--text-2,#a7adb8);padding-bottom:9px;font-size:12px}
+.retry-table th,.retry-table td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line,#2f343e);vertical-align:top;overflow-wrap:anywhere}
+.retry-table thead th{background:var(--surface-2,#1a1d23);font-weight:600}
+.retry-table tbody th{width:34%;font-weight:500;color:var(--text-2,#a7adb8)}
+.retry-table tbody td{width:33%}
+.retry-limitations{margin:12px 0;padding-left:20px;color:var(--text-2,#a7adb8);font-size:12px;line-height:1.7}
+.retry-current{display:grid;grid-template-columns:1fr 1fr;gap:9px;font-size:13px}
+.retry-current dd{margin:0}
+.retry-panel :is(button,input,textarea,summary,[tabindex]):focus-visible{outline:2px solid var(--accent,#f2b544);outline-offset:3px}
+.retry-panel button:disabled{opacity:.55;cursor:default}
+@media(max-width:680px){
+ .retry-panel{padding:16px}
+ .retry-card{align-items:flex-start;flex-direction:column;gap:9px}
+ .retry-card-actions{align-items:flex-start;max-width:none}
+ .retry-card-actions .retry-note{text-align:left}
+ .retry-table th,.retry-table td{padding:8px 6px;min-width:95px}
+ .retry-table tbody th{min-width:115px}
+}

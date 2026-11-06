@@ -1,4 +1,7 @@
 .env
+.env.*
+!.env.example
+practice-*.json
 data/
 __pycache__/
 *.pyc
@@ -7,8 +10,5 @@ test-results/
 .venv/
 runtime/
 static/dist/
-.env.*
-!.env.example
-practice-*.json
 /docs/collaboration/*
 !/docs/collaboration/BACKEND-BRIDGE.md

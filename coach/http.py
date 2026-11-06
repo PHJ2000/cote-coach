@@ -7,6 +7,7 @@ import zipfile
 from pathlib import Path
 from urllib.parse import parse_qs,urlsplit
 from . import store as st
+from .retries import RetryError
 
 
 def stream_file(h,file,mime,download=None):
@@ -38,7 +39,9 @@ def get(h,lab,path):
         mime=mimetypes.guess_type(file.name)[0] or 'application/octet-stream';stream_file(h,file,mime);return True
     if not path.startswith('/api/v2/'):return False
     try:
-        if path=='/api/v2/dashboard':result=lab.dashboard()
+        if path=='/api/v2/retries':result=lab.retry_list()
+        elif re.fullmatch(r'/api/v2/retry-comparison/[^/]+',path):result=lab.retry_comparison(path.rsplit('/',1)[-1])
+        elif path=='/api/v2/dashboard':result=lab.dashboard()
         elif path=='/api/v2/health':result=lab.health()
         elif path=='/api/v2/models':result=lab.codex.info()
         elif path.startswith('/api/v2/session/'):result=lab.view(path.rsplit('/',1)[-1])
@@ -63,6 +66,7 @@ def get(h,lab,path):
         else:h.send(404,{'error':'경로 없음'});return True
         h.send(200,result)
     except (BrokenPipeError,ConnectionResetError):pass # The editor cancels superseded requests.
+    except RetryError as exc:h.send(400,exc.as_dict())
     except Exception as exc:h.send(400,{'error':str(exc)[:1200]})
     return True
 
@@ -75,12 +79,14 @@ def post(h,lab,path):
         if path=='/api/v2/upload':
             q=parse_qs(urlsplit(h.path).query);one=lambda key:q[key][0]
             if h.headers.get('Content-Type')!='application/octet-stream':raise ValueError('미디어 전송 형식 오류')
-            result=lab.upload(one('sid'),one('kind'),one('segment'),int(one('seq')),int(one('start')),one('mime'),h.rfile.read(size))
+            result=lab.upload(one('sid'),one('kind'),one('segment'),int(one('seq')),int(one('start')),one('mime'),h.rfile.read(size),int(one('end')) if 'end' in q else None)
         else:
             if h.headers.get('Content-Type','').split(';')[0]!='application/json':raise ValueError('JSON 요청이 필요합니다.')
             d=json.loads(h.rfile.read(size))
             if not isinstance(d,dict):raise ValueError('객체가 필요합니다.')
-            if path=='/api/v2/start':result=lab.new_session(d)
+            if path=='/api/v2/retry-plan':result=lab.retry_plan(d)
+            elif path=='/api/v2/retry-start':result=lab.retry_start(d)
+            elif path=='/api/v2/start':result=lab.new_session(d)
             elif path=='/api/v2/events':result=lab.record(d['sid'],d['events'])
             elif path=='/api/v2/finish':result=lab.finish(d['sid'])
             elif path=='/api/v2/run':
@@ -89,8 +95,10 @@ def post(h,lab,path):
             elif path=='/api/v2/transcribe':result=lab.transcribe(d['sid'],d.get('kind','screen'),d.get('segment'))
             elif path=='/api/v2/transcript':
                 if not isinstance(d.get('segments'),list) or len(d['segments'])>20000:raise ValueError('전사문 형식 오류')
+                from .timing import valid_offset
+                clock_session=st.session(d['sid']);clock_now=st.now()
                 for segment in d['segments']:
-                    if type(segment.get('start_ms')) is not int or type(segment.get('end_ms')) is not int or not 0<=segment['start_ms']<=segment['end_ms']<=86400000 or not isinstance(segment.get('text'),str) or len(segment['text'])>5000:raise ValueError('전사문 시간·내용을 확인하세요.')
+                    if not valid_offset(clock_session,segment.get('start_ms'),clock_now) or not valid_offset(clock_session,segment.get('end_ms'),clock_now) or segment['start_ms']>segment['end_ms'] or not isinstance(segment.get('text'),str) or len(segment['text'])>5000:raise ValueError('전사문 시간·내용을 확인하세요.')
                 lab.save_transcripts(d['sid'],d['segments']);result={'saved':True}
             elif path=='/api/v2/chat':result=lab.chat(d['sid'],d)
             elif path=='/api/v2/cancel':
@@ -110,5 +118,6 @@ def post(h,lab,path):
                 result=lab.ide.request('s'+s['id']+'_'+pid,code,d['op'],max(0,int(d.get('line',0))),max(0,int(d.get('character',0))),context=context,resolve_id=d.get('resolve_id'))
             else:raise ValueError('경로 없음')
         h.send(200,result)
+    except RetryError as exc:h.send(400,exc.as_dict())
     except Exception as exc:h.send(400,{'error':str(exc)[:1200]})
     return True

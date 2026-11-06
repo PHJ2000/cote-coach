@@ -33,6 +33,8 @@ def init():
         for r in con.execute('SELECT id,state FROM jobs').fetchall():
             j=json.loads(r['state'])
             if j['status'] in {'queued','running'}:j.update(status='failed',error='서버가 재시작되어 작업이 중단되었습니다. 저장된 자료로 다시 요청하세요.');con.execute('UPDATE jobs SET state=? WHERE id=?',(dump(j),r['id']))
+    from .retries import init_schema
+    with db(True) as con:init_schema(con)
 
 def dump(obj):return json.dumps(obj,ensure_ascii=False)
 def session(sid):
@@ -54,5 +56,21 @@ def event(sid,kind,payload=None,pid='',ms=None,eid=None):
     if ms is None:ms=max(0,now()-session(sid)['started'])
     with db(True) as con:con.execute('INSERT OR IGNORE INTO events VALUES (?,?,?,?,?,?)',(sid,eid or uuid.uuid4().hex,int(ms),kind,pid,dump(payload or {})))
 
+def code_order(e):
+    """Tie-break among code events with the same ms: client sequence, events
+    without one (legacy) first, then arrival (rowid, via stable sort)."""
+    return e['payload'].get('client_seq',-1)
+
 def events(sid):
-    with db() as con:return [dict(r)|{'payload':json.loads(r['payload'])} for r in con.execute('SELECT * FROM events WHERE sid=? ORDER BY ms,rowid',(sid,))]
+    """Events by (ms, arrival). Code events sharing an ms are reordered among their
+    own slots by client sequence, so replay/evidence agree with the current-code rule
+    in service.Lab.record; other events keep their positions."""
+    with db() as con:rows=[dict(r)|{'payload':json.loads(r['payload'])} for r in con.execute('SELECT * FROM events WHERE sid=? ORDER BY ms,rowid',(sid,))]
+    i=0
+    while i<len(rows):
+        j=i
+        while j<len(rows) and rows[j]['ms']==rows[i]['ms']:j+=1
+        slots=[k for k in range(i,j) if rows[k]['kind']=='code']
+        for k,e in zip(slots,sorted((rows[k] for k in slots),key=code_order)):rows[k]=e
+        i=j
+    return rows

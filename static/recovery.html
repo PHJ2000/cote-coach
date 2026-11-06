@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>미전송 기록 백업 · 코테 연습실</title>
+<style>body{max-width:720px;margin:50px auto;padding:20px;font:16px/1.7 system-ui,sans-serif;color:#222;background:#fafafa}h1{font-size:26px}button{font:inherit;margin:8px 8px 8px 0;padding:10px 15px;cursor:pointer}#status{padding:16px;background:#eee;border-radius:8px}.fine{color:#555;font-size:14px}</style>
+<script type="module" src="/dist/recovery.js"></script></head><body>
+<h1>미전송 기록을 파일로 보관하기</h1>
+<p>진행 중인 연습 탭을 그대로 둔 채, 브라우저에 저장된 미전송 코드·이벤트·녹화 조각의 사본을 내려받습니다.</p>
+<p>이 페이지는 녹화를 시작하거나 종료하지 않고, 기록을 서버로 보내거나 삭제하지 않습니다. 저장된 원래 시각과 내용도 바꾸지 않습니다.</p>
+<button type="button" id="backup">미전송 기록 백업 받기</button><button type="button" id="inspect">저장된 개수 다시 확인</button>
+<p id="status" role="status">저장소를 확인하고 있어요…</p>
+<p class="fine">연습 중인 탭과 같은 주소·브라우저 프로필로 열어 주세요. localhost와 127.0.0.1의 저장소는 서로 다릅니다. 아직 녹화 중이거나 메모리에만 있는 조각은 이 백업에 포함되지 않습니다. 백업 후에도 원래 연습 탭과 브라우저 저장소를 유지해 주세요.</p>
+</body></html>

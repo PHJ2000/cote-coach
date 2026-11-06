@@ -26,7 +26,8 @@ class Solution {
 }'''
         result = run_java(code, problem, submit=True)
         self.assertEqual((result['status'], result['passed'], result['total']),
-                         ('passed', 7, 7), result)
+                         ('passed', 9, 9), result)  # 7 examples + 2 large hidden cases
+        self.assertTrue(all(t.get('time_ms') is not None for t in result['tests']))
         self.assertEqual(result['tests'][0]['args'], ['([]){}'])
         self.assertIs(result['tests'][0]['actual'], True)
 
